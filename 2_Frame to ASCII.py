@@ -67,12 +67,12 @@ def create_ascii_frames_pickle_theater(frame_path, pickle_path, columns, rows, c
             filled_length = int(bar_length * progress)
             bar = '█' * filled_length + '-' * (bar_length - filled_length)
 
-            print(f"\rProcessing frame {frame_index + 1}/{total_frames} [{bar}] {progress * 100:.2f}% | Est. time: {estimated_time:.2f}s", end="")
+            print(f"\r{progress * 100:.2f}% [{bar}] Est. time: {estimated_time:.2f}s", end="")
             return ascii_frame
 
         results = list(executor.map(process_frame, frame_files, range(total_frames)))
-    
-    print(f"\rProcessing frame {total_frames}/{total_frames} [{'█'*40}] 100.00% | Est. time: 0.00s", end="")
+
+    print(f"\r100.00% [{'█'*40}] Est. time: 0.00s", end="")
 
     ascii_frames = [result for result in results if result is not None]
 
@@ -96,14 +96,14 @@ def play_ascii_video_theater(pickle_path, columns, rows):
             sys.stdout.write("\033[H")
             sys.stdout.write(frame)
             sys.stdout.flush()
-            time.sleep(0.05)
+            time.sleep(0.009)
 
     except FileNotFoundError:
         print(f"Pickle file not found: {pickle_path}")
     except Exception as e:
         print(f"Error playing video: {e}")
 
-def get_optimal_dimensions(frame_path, target_width=500): #increased to 500
+def get_optimal_dimensions(frame_path, target_width=400):
     """Calculates optimal columns and rows."""
     first_frame_path = os.path.join(frame_path, sorted(os.listdir(frame_path))[0])
     img = Image.open(first_frame_path)
