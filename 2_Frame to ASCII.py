@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 import sys
 import platform
 import ctypes
+from tqdm import tqdm  # Import tqdm for progress bar
 
 def rgb_to_ansi(r, g, b):
     """Converts RGB to closest ANSI color code."""
@@ -47,14 +48,19 @@ def ascii_theater_convert(image_path, columns, rows, char_set):
     return ascii_art
 
 def create_ascii_frames_pickle_theater(frame_path, pickle_path, columns, rows, char_set):
-    """Creates a pickle file containing colored ASCII art frames."""
+    """Creates a pickle file containing colored ASCII art frames with progress bar."""
     ascii_frames = []
     frame_files = sorted([f for f in os.listdir(frame_path) if f.endswith(".jpg")], key=lambda x: int(x[5:-4]))
+    total_frames = len(frame_files)
 
-    with ThreadPoolExecutor() as executor:
-        results = list(executor.map(lambda frame_file: ascii_theater_convert(os.path.join(frame_path, frame_file), columns, rows, char_set), frame_files))
-
-    ascii_frames = [result for result in results if result is not None]
+    with tqdm(total=total_frames, desc="Processing frames") as pbar:  # Initialize progress bar
+        with ThreadPoolExecutor() as executor:
+            results = []
+            for frame_file in frame_files:
+                results.append(executor.submit(ascii_theater_convert, os.path.join(frame_path, frame_file), columns, rows, char_set))
+            for future in results:
+                ascii_frames.append(future.result())
+                pbar.update(1) #update progress bar
 
     with open(pickle_path, 'wb') as f:
         pickle.dump(ascii_frames, f)
