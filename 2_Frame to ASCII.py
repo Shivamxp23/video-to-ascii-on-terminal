@@ -65,8 +65,8 @@ def play_ascii_video_theater(pickle_path):
 
         for frame in ascii_frames:
             os.system('cls')
-            print(frame)
-            time.sleep(0.05)  # Adjust delay as needed
+            print(frame, end='') #Added end='' to prevent extra newline.
+            time.sleep(0.05)
     except FileNotFoundError:
         print(f"Pickle file not found: {pickle_path}")
     except Exception as e:
