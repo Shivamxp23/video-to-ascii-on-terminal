@@ -6,7 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 import sys
 import platform
 import ctypes
-from tqdm import tqdm  # Import tqdm for progress bar
+from tqdm import tqdm
+import msvcrt # Import msvcrt for Windows spacebar detection
 
 def rgb_to_ansi(r, g, b):
     """Converts RGB to closest ANSI color code."""
@@ -53,14 +54,14 @@ def create_ascii_frames_pickle_theater(frame_path, pickle_path, columns, rows, c
     frame_files = sorted([f for f in os.listdir(frame_path) if f.endswith(".jpg")], key=lambda x: int(x[5:-4]))
     total_frames = len(frame_files)
 
-    with tqdm(total=total_frames, desc="Processing frames") as pbar:  # Initialize progress bar
+    with tqdm(total=total_frames, desc="Processing frames") as pbar:
         with ThreadPoolExecutor() as executor:
             results = []
             for frame_file in frame_files:
                 results.append(executor.submit(ascii_theater_convert, os.path.join(frame_path, frame_file), columns, rows, char_set))
             for future in results:
                 ascii_frames.append(future.result())
-                pbar.update(1) #update progress bar
+                pbar.update(1)
 
     with open(pickle_path, 'wb') as f:
         pickle.dump(ascii_frames, f)
@@ -111,6 +112,20 @@ columns, rows = get_optimal_dimensions(frame_path)
 if not os.path.exists(pickle_path):
     print("Creating colored ASCII frames pickle...")
     create_ascii_frames_pickle_theater(frame_path, pickle_path, columns, rows, char_set)
+
+print("Press SPACE to play the video...")
+
+while True: #Wait for spacebar input.
+    if platform.system() == 'Windows':
+        if msvcrt.kbhit():
+            if msvcrt.getch() == b' ':
+                break
+    else: #for linux/mac
+        import select
+        i, o, e = select.select([sys.stdin], [], [], 0.001)
+        if i:
+            if sys.stdin.read(1) == ' ':
+                break
 
 print("Playing colored ASCII video...")
 play_ascii_video_theater(pickle_path)
