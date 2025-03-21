@@ -13,7 +13,7 @@ def rgb_to_ansi(r, g, b):
         if r < 8:
             return 16  # Black
         if r > 248:
-            return 231 # White
+            return 231  # White
         return 232 + (r - 8) * 24 / 240  # Grayscale range
     r_6 = int(r * 5 / 255)
     g_6 = int(g * 5 / 255)
@@ -21,19 +21,19 @@ def rgb_to_ansi(r, g, b):
     return 16 + 36 * r_6 + 6 * g_6 + b_6
 
 def ascii_theater_convert(image_path, columns, rows, char_set):
-    """Converts an image to colored ASCII art in the 'ascii.theater' style."""
+    """Converts an image to colored ASCII art with character as background and foreground."""
     img = Image.open(image_path).resize((columns, rows))
     pixels = list(img.getdata())
 
     def get_char(pixel):
         """Maps pixel brightness and color to an ASCII character."""
-        if isinstance(pixel, tuple): #color image
+        if isinstance(pixel, tuple):  # Color image
             r, g, b = pixel
             brightness = int(0.2989 * r + 0.5870 * g + 0.1140 * b)
             ansi_color = rgb_to_ansi(r, g, b)
             char_index = int(brightness / 255 * (len(char_set) - 1))
-            return f"\x1b[38;5;{int(ansi_color)}m{char_set[char_index]}"
-        else: #grayscale image
+            return f"\x1b[48;5;{int(ansi_color)}m\x1b[38;5;{int(ansi_color)}m{char_set[char_index]}"  # Set background and foreground
+        else:  # Grayscale image
             brightness = pixel
             char_index = int(brightness / 255 * (len(char_set) - 1))
             return char_set[char_index]
@@ -43,7 +43,7 @@ def ascii_theater_convert(image_path, columns, rows, char_set):
         ascii_art += get_char(pixel)
         if (i + 1) % columns == 0:
             ascii_art += '\x1b[0m\n'  # Reset color and add newline
-    ascii_art += '\x1b[0m' # reset color at the end.
+    ascii_art += '\x1b[0m'  # Reset color at the end.
     return ascii_art
 
 def create_ascii_frames_pickle_theater(frame_path, pickle_path, columns, rows, char_set):
@@ -82,7 +82,7 @@ def get_optimal_dimensions(frame_path, target_width=200):
     width, height = img.size
     aspect_ratio = width / height
     columns = target_width
-    rows = int(target_width / aspect_ratio * 0.45) # 0.45 is a tweak to account for character aspect ratios.
+    rows = int(target_width / aspect_ratio * 0.45)  # 0.45 is a tweak to account for character aspect ratios.
     return columns, rows
 
 def clear_screen():
@@ -98,7 +98,7 @@ def clear_screen():
 video_number = int(input("Enter the video number: "))
 frame_path = rf"C:\Users\soni8\OneDrive\Desktop\everything\University 2.0\Project(s)\Run video on terminal\video {video_number}\frames"
 pickle_path = rf"C:\Users\soni8\OneDrive\Desktop\everything\University 2.0\Project(s)\Run video on terminal\video {video_number}\ascii_frames_theater_color.pkl"
-char_set = " .:-=+*#%@"
+char_set = "██▓▒░ "  # Denser Char set.
 
 columns, rows = get_optimal_dimensions(frame_path)
 
