@@ -1,4 +1,4 @@
-import cv2
+from PIL import Image
 import os
 import time
 import pickle
@@ -6,68 +6,78 @@ from concurrent.futures import ThreadPoolExecutor
 import sys
 import platform
 import ctypes
-from tqdm import tqdm
-import msvcrt
+import math
+import msvcrt # Import for Windows spacebar detection
 
 def rgb_to_ansi(r, g, b):
     """Converts RGB to closest ANSI color code."""
-    if r == g == b:
+    if r == g == b:  # Grayscale
         if r < 8:
-            return 16
+            return 16  # Black
         if r > 248:
-            return 231
-        return 232 + (r - 8) * 24 / 240
+            return 231  # White
+        return 232 + (r - 8) * 24 / 240  # Grayscale range
     r_6 = int(r * 5 / 255)
     g_6 = int(g * 5 / 255)
     b_6 = int(b * 5 / 255)
     return 16 + 36 * r_6 + 6 * g_6 + b_6
 
-ansi_colors = {}
-
 def ascii_theater_convert(image_path, columns, rows, char_set):
     """Converts an image to colored ASCII art with character as background and foreground."""
-    img = cv2.imread(image_path)
-    img = cv2.resize(img, (columns, rows), interpolation=cv2.INTER_FAST_LINEAR)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    pixels = img.reshape(-1, 3).tolist()
+    img = Image.open(image_path).resize((columns, rows))
+    pixels = list(img.getdata())
 
     def get_char(pixel):
         """Maps pixel brightness and color to an ASCII character."""
-        r, g, b = pixel
-        if (r,g,b) not in ansi_colors:
-            ansi_colors[(r, g, b)] = rgb_to_ansi(r, g, b)
-
-        ansi_color = ansi_colors[(r, g, b)]
-        brightness = int(0.2989 * r + 0.5870 * g + 0.1140 * b)
-        char_index = int(brightness / 255 * (len(char_set) - 1))
-        return f"\x1b[48;5;{int(ansi_color)}m\x1b[38;5;{int(ansi_color)}m{char_set[char_index]}"
+        if isinstance(pixel, tuple):  # Color image
+            r, g, b = pixel
+            brightness = int(0.2989 * r + 0.5870 * g + 0.1140 * b)
+            ansi_color = rgb_to_ansi(r, g, b)
+            char_index = int(brightness / 255 * (len(char_set) - 1))
+            return f"\x1b[48;5;{int(ansi_color)}m\x1b[38;5;{int(ansi_color)}m{char_set[char_index]}"  # Set background and foreground
+        else:  # Grayscale image
+            brightness = pixel
+            char_index = int(brightness / 255 * (len(char_set) - 1))
+            return char_set[char_index]
 
     ascii_art = ''
-    for pixel in pixels:
+    for i, pixel in enumerate(pixels):
         ascii_art += get_char(pixel)
-    for i in range(rows):
-        ascii_art += '\x1b[0m\n'
-    ascii_art += '\x1b[0m'
+        if (i + 1) % columns == 0:
+            ascii_art += '\x1b[0m\n'  # Reset color and add newline
+    ascii_art += '\x1b[0m'  # Reset color at the end.
     return ascii_art
 
 def create_ascii_frames_pickle_theater(frame_path, pickle_path, columns, rows, char_set):
-    """Creates a pickle file containing colored ASCII art frames with progress bar."""
+    """Creates a pickle file containing colored ASCII art frames."""
     ascii_frames = []
     frame_files = sorted([f for f in os.listdir(frame_path) if f.endswith(".jpg")], key=lambda x: int(x[5:-4]))
     total_frames = len(frame_files)
+    start_time = time.time()
 
-    with tqdm(total=total_frames, desc="Processing frames") as pbar:
-        with ThreadPoolExecutor() as executor:
-            results = []
-            for frame_file in frame_files:
-                results.append(executor.submit(ascii_theater_convert, os.path.join(frame_path, frame_file), columns, rows, char_set))
-            for future in results:
-                ascii_frames.append(future.result())
-                pbar.update(1)
+    with ThreadPoolExecutor() as executor:
+        def process_frame(frame_file, frame_index):
+            ascii_frame = ascii_theater_convert(os.path.join(frame_path, frame_file), columns, rows, char_set)
+            elapsed_time = time.time() - start_time
+            frames_processed = frame_index + 1
+            remaining_frames = total_frames - frames_processed
+            estimated_time = (elapsed_time / frames_processed) * remaining_frames if frames_processed > 0 else 0
+            
+            progress = frames_processed / total_frames
+            bar_length = 40
+            filled_length = int(bar_length * progress)
+            bar = '█' * filled_length + '-' * (bar_length - filled_length)
+            
+            print(f"\rProcessing frame {frame_index + 1}/{total_frames} [{bar}] {progress * 100:.2f}% | Est. time: {estimated_time:.2f}s", end="")
+            return ascii_frame
+        
+        results = list(executor.map(process_frame, frame_files, range(total_frames)))
+    
+    ascii_frames = [result for result in results if result is not None]
 
     with open(pickle_path, 'wb') as f:
         pickle.dump(ascii_frames, f)
-    print(f"ASCII frames pickled to {pickle_path}")
+    print(f"\nASCII frames pickled to {pickle_path}")
 
 def play_ascii_video_theater(pickle_path):
     """Plays the colored ASCII video from the pickle file."""
@@ -75,21 +85,17 @@ def play_ascii_video_theater(pickle_path):
         with open(pickle_path, 'rb') as f:
             ascii_frames = pickle.load(f)
 
-        frame_rate = 20
-        frame_delay = 1 / frame_rate
-        last_frame_time = time.perf_counter()
+        print("Press spacebar to play the video.")
+        
+        while True:
+            if msvcrt.kbhit():
+                if ord(msvcrt.getch()) == 32: # 32 is the ASCII code for spacebar
+                    break
 
         for frame in ascii_frames:
-            current_time = time.perf_counter()
-            elapsed_time = current_time - last_frame_time
-
-            if elapsed_time >= frame_delay:
-                clear_screen()
-                print(frame, end='')
-                last_frame_time = current_time
-            else:
-                time.sleep(frame_delay - elapsed_time)
-
+            clear_screen()
+            print(frame, end='')
+            time.sleep(0.05)
     except FileNotFoundError:
         print(f"Pickle file not found: {pickle_path}")
     except Exception as e:
@@ -98,11 +104,11 @@ def play_ascii_video_theater(pickle_path):
 def get_optimal_dimensions(frame_path, target_width=200):
     """Calculates optimal columns and rows based on the first frame's aspect ratio."""
     first_frame_path = os.path.join(frame_path, sorted(os.listdir(frame_path))[0])
-    img = cv2.imread(first_frame_path)
-    height, width, _ = img.shape
+    img = Image.open(first_frame_path)
+    width, height = img.size
     aspect_ratio = width / height
     columns = target_width
-    rows = int(target_width / aspect_ratio * 0.45)
+    rows = int(target_width / aspect_ratio * 0.45)  # 0.45 is a tweak to account for character aspect ratios.
     return columns, rows
 
 def clear_screen():
@@ -114,30 +120,17 @@ def clear_screen():
     else:
         print("\x1b[H\x1b[J", end="")
 
+# Example Usage:
 video_number = int(input("Enter the video number: "))
 frame_path = rf"C:\Users\soni8\OneDrive\Desktop\everything\University 2.0\Project(s)\Run video on terminal\video {video_number}\frames"
 pickle_path = rf"C:\Users\soni8\OneDrive\Desktop\everything\University 2.0\Project(s)\Run video on terminal\video {video_number}\ascii_frames_theater_color.pkl"
-char_set = "██▓▒░ "
+char_set = "██▓▒░ "  # Denser Char set.
 
 columns, rows = get_optimal_dimensions(frame_path)
 
 if not os.path.exists(pickle_path):
     print("Creating colored ASCII frames pickle...")
     create_ascii_frames_pickle_theater(frame_path, pickle_path, columns, rows, char_set)
-
-print("Press SPACE to play the video...")
-
-while True:
-    if platform.system() == 'Windows':
-        if msvcrt.kbhit():
-            if msvcrt.getch() == b' ':
-                break
-    else:
-        import select
-        i, o, e = select.select([sys.stdin], [], [], 0.001)
-        if i:
-            if sys.stdin.read(1) == ' ':
-                break
 
 print("Playing colored ASCII video...")
 play_ascii_video_theater(pickle_path)
