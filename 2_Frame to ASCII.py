@@ -103,7 +103,7 @@ def play_ascii_video_theater(pickle_path, columns, rows):
     except Exception as e:
         print(f"Error playing video: {e}")
 
-def get_optimal_dimensions(frame_path, target_width=200):
+def get_optimal_dimensions(frame_path, target_width=500): #increased to 500
     """Calculates optimal columns and rows."""
     first_frame_path = os.path.join(frame_path, sorted(os.listdir(frame_path))[0])
     img = Image.open(first_frame_path)
