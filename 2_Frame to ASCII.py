@@ -1,26 +1,34 @@
-from ascii_magic import AsciiArt
-import pickle
+from PIL import Image
 import os
 import time
-import threading
+import pickle
 from concurrent.futures import ThreadPoolExecutor
 
-def convert_frame_to_ascii(frame_path, frame_num):
-    """Converts a single frame to ASCII art."""
-    try:
-        my_art = AsciiArt.from_image(os.path.join(frame_path, f"frame{frame_num}.jpg"))
-        return my_art.to_ascii(columns=120)  # Adjust columns as needed
-    except Exception as e:
-        print(f"Error processing frame {frame_num}: {e}")
-        return None
+def ascii_theater_convert(image_path, columns, rows, char_set):
+    """Converts an image to ASCII art in the 'ascii.theater' style."""
+    img = Image.open(image_path).convert('L')  # Convert to grayscale
+    img = img.resize((columns, rows))
+    pixels = list(img.getdata())
 
-def create_ascii_frames_pickle(frame_path, pickle_path):
-    """Creates a pickle file containing ASCII art frames."""
+    def get_char(pixel_value):
+        """Maps pixel brightness to an ASCII character."""
+        index = int(pixel_value / 255 * (len(char_set) - 1))
+        return char_set[index]
+
+    ascii_art = ''
+    for i, pixel in enumerate(pixels):
+        ascii_art += get_char(pixel)
+        if (i + 1) % columns == 0:
+            ascii_art += '\n'
+    return ascii_art
+
+def create_ascii_frames_pickle_theater(frame_path, pickle_path, columns, rows, char_set):
+    """Creates a pickle file containing ASCII art frames in the 'ascii.theater' style."""
     ascii_frames = []
-    frame_files = sorted([f for f in os.listdir(frame_path) if f.endswith(".jpg")], key=lambda x: int(x[5:-4])) #sort by frame number
+    frame_files = sorted([f for f in os.listdir(frame_path) if f.endswith(".jpg")], key=lambda x: int(x[5:-4]))
 
     with ThreadPoolExecutor() as executor:
-        results = list(executor.map(lambda frame_file: convert_frame_to_ascii(frame_path, int(frame_file[5:-4])), frame_files))
+        results = list(executor.map(lambda frame_file: ascii_theater_convert(os.path.join(frame_path, frame_file), columns, rows, char_set), frame_files))
 
     ascii_frames = [result for result in results if result is not None]
 
@@ -28,7 +36,7 @@ def create_ascii_frames_pickle(frame_path, pickle_path):
         pickle.dump(ascii_frames, f)
     print(f"ASCII frames pickled to {pickle_path}")
 
-def play_ascii_video(pickle_path):
+def play_ascii_video_theater(pickle_path):
     """Plays the ASCII video from the pickle file."""
     try:
         with open(pickle_path, 'rb') as f:
@@ -43,23 +51,19 @@ def play_ascii_video(pickle_path):
     except Exception as e:
         print(f"Error playing video: {e}")
 
-# Clear the terminal
-os.system('cls')
-
-# Change this number depending on the video you want to play
+# Example Usage:
 video_number = int(input("Enter the video number: "))
-
-# Path to the folder containing the frames for respective video
 frame_path = rf"C:\Users\soni8\OneDrive\Desktop\everything\University 2.0\Project(s)\Run video on terminal\video {video_number}\frames"
-
-# Path to store the pickled ASCII frames
-pickle_path = rf"C:\Users\soni8\OneDrive\Desktop\everything\University 2.0\Project(s)\Run video on terminal\video {video_number}\ascii_frames.pkl"
+pickle_path = rf"C:\Users\soni8\OneDrive\Desktop\everything\University 2.0\Project(s)\Run video on terminal\video {video_number}\ascii_frames_theater.pkl"
+char_set = " .:-=+*#%@"  # Smaller, more granular character set
+columns = 200 # increase columns for more detail
+rows = 50 # decrease rows for a wider image
 
 if not os.path.exists(pickle_path):
     print("Creating ASCII frames pickle...")
-    create_ascii_frames_pickle(frame_path, pickle_path)
+    create_ascii_frames_pickle_theater(frame_path, pickle_path, columns, rows, char_set)
 
 print("Playing ASCII video...")
-play_ascii_video(pickle_path)
+play_ascii_video_theater(pickle_path)
 
 os.system('cls')
