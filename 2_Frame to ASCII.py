@@ -72,13 +72,23 @@ def play_ascii_video_theater(pickle_path):
     except Exception as e:
         print(f"Error playing video: {e}")
 
+def get_optimal_dimensions(frame_path, target_width=200):
+    """Calculates optimal columns and rows based on the first frame's aspect ratio."""
+    first_frame_path = os.path.join(frame_path, sorted(os.listdir(frame_path))[0])
+    img = Image.open(first_frame_path)
+    width, height = img.size
+    aspect_ratio = width / height
+    columns = target_width
+    rows = int(target_width / aspect_ratio * 0.45) # 0.45 is a tweak to account for character aspect ratios.
+    return columns, rows
+
 # Example Usage:
 video_number = int(input("Enter the video number: "))
 frame_path = rf"C:\Users\soni8\OneDrive\Desktop\everything\University 2.0\Project(s)\Run video on terminal\video {video_number}\frames"
 pickle_path = rf"C:\Users\soni8\OneDrive\Desktop\everything\University 2.0\Project(s)\Run video on terminal\video {video_number}\ascii_frames_theater_color.pkl"
 char_set = " .:-=+*#%@"
-columns = 200
-rows = 50
+
+columns, rows = get_optimal_dimensions(frame_path)
 
 if not os.path.exists(pickle_path):
     print("Creating colored ASCII frames pickle...")
