@@ -3,6 +3,9 @@ import os
 import time
 import pickle
 from concurrent.futures import ThreadPoolExecutor
+import sys
+import platform
+import ctypes
 
 def rgb_to_ansi(r, g, b):
     """Converts RGB to closest ANSI color code."""
@@ -64,8 +67,8 @@ def play_ascii_video_theater(pickle_path):
             ascii_frames = pickle.load(f)
 
         for frame in ascii_frames:
-            os.system('cls')
-            print(frame, end='') #Added end='' to prevent extra newline.
+            clear_screen()
+            print(frame, end='')
             time.sleep(0.05)
     except FileNotFoundError:
         print(f"Pickle file not found: {pickle_path}")
@@ -81,6 +84,15 @@ def get_optimal_dimensions(frame_path, target_width=200):
     columns = target_width
     rows = int(target_width / aspect_ratio * 0.45) # 0.45 is a tweak to account for character aspect ratios.
     return columns, rows
+
+def clear_screen():
+    """Clears the terminal screen."""
+    if platform.system() == 'Windows':
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleCursorPosition(kernel32.GetStdHandle(-11), 0)
+        print("\x1b[2J", end="")
+    else:
+        print("\x1b[H\x1b[J", end="")
 
 # Example Usage:
 video_number = int(input("Enter the video number: "))
